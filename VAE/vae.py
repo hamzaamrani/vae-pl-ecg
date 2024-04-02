@@ -9,25 +9,37 @@ class Encoder(nn.Module):
         super(Encoder, self).__init__()
 
         self.fc1 = nn.Linear(input_dim, hidden_dim//2)
-        self.fc2 = nn.Linear(hidden_dim//2, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim//2, hidden_dim//4)
+        self.fc3 = nn.Linear(hidden_dim//4, hidden_dim//4)
         self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(0.2)
                 
     def forward(self, x):
         x = self.relu(self.fc1(x))
+        x = self.dropout(x)
         x = self.relu(self.fc2(x))
+        x = self.dropout(x)
+        x = self.relu(self.fc3(x))
+        x = self.dropout(x)
         return x
     
 class Decoder(nn.Module):
     def __init__(self, latent_dim, hidden_dim, output_dim):
         super(Decoder, self).__init__()
-        self.fc1 = nn.Linear(latent_dim, hidden_dim//2)
-        self.fc2 = nn.Linear(hidden_dim//2, hidden_dim)
+        self.fc1 = nn.Linear(latent_dim, hidden_dim//4)
+        self.fc2 = nn.Linear(hidden_dim//4, hidden_dim//2)
+        self.fc3 = nn.Linear(hidden_dim//2, hidden_dim)
         self.fc_output = nn.Linear(hidden_dim, output_dim)
         self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(0.2)
         
     def forward(self, z):
         x_hat = self.relu(self.fc1(z))
+        x_hat = self.dropout(x_hat)
         x_hat = self.relu(self.fc2(x_hat))
+        x_hat = self.dropout(x_hat)
+        x_hat = self.relu(self.fc3(x_hat))
+        x_hat = self.dropout(x_hat)
         x_hat = self.fc_output(x_hat)
         #x_hat = torch.sigmoid(x_hat)
         
@@ -49,11 +61,14 @@ class VAE(pl.LightningModule):
         self.decoder = Decoder(self.latent_dim, self.hidden_dim, self.output_dim)
 
         # distribution parameters
-        self.fc_mu = nn.Linear(self.hidden_dim, self.latent_dim)
-        self.fc_var = nn.Linear(self.hidden_dim, self.latent_dim)
+        self.fc_mu = nn.Linear(self.hidden_dim//4, self.latent_dim)
+        self.fc_var = nn.Linear(self.hidden_dim//4, self.latent_dim)
 
         # for the gaussian likelihood
         self.log_scale = nn.Parameter(torch.Tensor([0.0]))
+
+
+        self.beta = 1 # 1=VAE
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=1e-4)
@@ -125,7 +140,7 @@ class VAE(pl.LightningModule):
         kl = self.kl_divergence(z, mu, std)
 
         # loss
-        loss = -(recon_loss - kl)
+        loss = -(recon_loss - self.beta*kl)
         #loss = (kl - recon_loss)
         loss = loss.mean()
 
@@ -141,7 +156,7 @@ class VAE(pl.LightningModule):
         self.logger.experiment.add_scalars('kl', 
                                            {'train': kl.mean()}, global_step=self.current_epoch)
         self.logger.experiment.add_scalars('recon_loss', 
-                                           {'train': recon_loss.mean()}, global_step=self.current_epoch)
+                                           {'train': -recon_loss.mean()}, global_step=self.current_epoch)
         
         return loss
     
@@ -170,7 +185,7 @@ class VAE(pl.LightningModule):
         kl = self.kl_divergence(z, mu, std)
 
         # loss
-        loss = -(recon_loss - kl)
+        loss = -(recon_loss - self.beta*kl)
         loss = loss.mean()
 
         '''self.log_dict({
@@ -185,7 +200,7 @@ class VAE(pl.LightningModule):
         self.logger.experiment.add_scalars('kl', 
                                            {'val': kl.mean()}, global_step=self.current_epoch)
         self.logger.experiment.add_scalars('recon_loss', 
-                                           {'val': recon_loss.mean()}, global_step=self.current_epoch)
+                                           {'val': -recon_loss.mean()}, global_step=self.current_epoch)
 
         return loss
 
