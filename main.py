@@ -67,7 +67,7 @@ def prepare_dataset(num_samples = 5000, num_points=1000):
         modulation_signal = np.sin(2 * np.pi * modulation_frequency * time_base)
         combined_values = (1 + modulation_signal) * combined_values
         noise = np.random.normal(0, 0.1, combined_values.shape)
-        y = combined_values + noise'''
+        y = combined_values + noise#'''
 
         #3rd experiment: baseline + random noise (more variable) + random modulation
         '''time_base = np.linspace(0, 4, 1024) #4s 256Hz
@@ -128,22 +128,8 @@ def main():
     DIM = 1024
     # Load dataset
     x_train, x_val, scaler = prepare_dataset(num_samples = 20000, num_points=DIM)
-    train_dataloader = DataLoader(TensorDataset(x_train), batch_size=64, num_workers=3) 
-    val_dataloader = DataLoader(TensorDataset(x_val), batch_size=64, num_workers=3) 
-
-    # TESTING reconstruction
-    for i in range(10):
-        x = torch.Tensor(x_val[i])
-        x = scaler.inverse_transform([x.numpy()])[0]
-
-        # Plotting
-        plt.figure(figsize=(10, 4))
-        plt.plot(x, label="original")
-        plt.xlabel('x')
-        plt.ylabel('y')
-        plt.grid(True)
-        plt.legend()
-        plt.savefig(f"plots/img_{i}.png")
+    train_dataloader = DataLoader(TensorDataset(x_train), batch_size=32, num_workers=3) 
+    val_dataloader = DataLoader(TensorDataset(x_val), batch_size=32, num_workers=3) 
 
     # Train VAE
     vae = VAE.VAE(input_dim=DIM,latent_dim=64, hidden_dim=512, output_dim=DIM)
@@ -153,7 +139,7 @@ def main():
 
 
     # TESTING reconstruction
-    for i in range(10):
+    for i in range(20):
         x = torch.Tensor(x_val[i])
         x_rec = vae(x)
 

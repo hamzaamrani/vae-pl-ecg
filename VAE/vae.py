@@ -11,7 +11,7 @@ class Encoder(nn.Module):
         self.fc1 = nn.Linear(input_dim, hidden_dim//2)
         self.fc2 = nn.Linear(hidden_dim//2, hidden_dim//4)
         self.fc3 = nn.Linear(hidden_dim//4, hidden_dim//4)
-        self.relu = nn.ReLU()
+        self.relu = nn.GELU()
         self.dropout = nn.Dropout(0.2)
                 
     def forward(self, x):
@@ -20,7 +20,7 @@ class Encoder(nn.Module):
         x = self.relu(self.fc2(x))
         x = self.dropout(x)
         x = self.relu(self.fc3(x))
-        x = self.dropout(x)
+        #x = self.dropout(x)
         return x
     
 class Decoder(nn.Module):
@@ -30,7 +30,7 @@ class Decoder(nn.Module):
         self.fc2 = nn.Linear(hidden_dim//4, hidden_dim//2)
         self.fc3 = nn.Linear(hidden_dim//2, hidden_dim)
         self.fc_output = nn.Linear(hidden_dim, output_dim)
-        self.relu = nn.ReLU()
+        self.relu = nn.GELU()
         self.dropout = nn.Dropout(0.2)
         
     def forward(self, z):
@@ -39,7 +39,7 @@ class Decoder(nn.Module):
         x_hat = self.relu(self.fc2(x_hat))
         x_hat = self.dropout(x_hat)
         x_hat = self.relu(self.fc3(x_hat))
-        x_hat = self.dropout(x_hat)
+        #x_hat = self.dropout(x_hat)
         x_hat = self.fc_output(x_hat)
         #x_hat = torch.sigmoid(x_hat)
         
@@ -67,11 +67,10 @@ class VAE(pl.LightningModule):
         # for the gaussian likelihood
         self.log_scale = nn.Parameter(torch.Tensor([0.0]))
 
-
         self.beta = 1 # 1=VAE
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=1e-4)
+        return torch.optim.Adam(self.parameters(), lr=1e-3)
 
     def gaussian_likelihood(self, x_hat, logscale, x):
         scale = torch.exp(logscale)
@@ -117,39 +116,16 @@ class VAE(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x = batch[0]
 
-        # encode x to get the mu and variance parameters
         x_encoded = self.encoder(x)
         mu, log_var = self.fc_mu(x_encoded), self.fc_var(x_encoded)
-
-        # reparameterization trick: sample z from q
         std = torch.exp(log_var / 2)
         q = torch.distributions.Normal(mu, std)
         z = q.rsample()
-        # similar reparameterization trick
-        #std = torch.exp(log_var / 2)
-        #eps = torch.randn_like(log_var)  # sampling epsilon        
-        #z = mu + log_var*eps    
-
-        # decoded
         x_hat = self.decoder(z)
 
-        # reconstruction loss
         recon_loss = self.gaussian_likelihood(x_hat, self.log_scale, x)
-
-        # kl
         kl = self.kl_divergence(z, mu, std)
-
-        # loss
         loss = -(recon_loss - self.beta*kl)
-        #loss = (kl - recon_loss)
-        loss = loss.mean()
-
-        '''self.log_dict({
-            'loss/train': loss,
-            'kl/train': kl.mean(),
-            'recon_loss/train': recon_loss.mean()
-        }, on_epoch=True, on_step=False,
-        batch_size=batch[0].shape[1])'''
         
         self.logger.experiment.add_scalars('loss', 
                                            {'train': loss}, global_step=self.current_epoch)
@@ -163,37 +139,16 @@ class VAE(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         x = batch[0]
 
-        # encode x to get the mu and variance parameters
         x_encoded = self.encoder(x)
         mu, log_var = self.fc_mu(x_encoded), self.fc_var(x_encoded)
-
-        # reparameterization trick: sample z from q
         std = torch.exp(log_var / 2)
         q = torch.distributions.Normal(mu, std)
         z = q.rsample()
-        # similar reparameterization trick
-        # epsilon = torch.randn_like(log_var)  # sampling epsilon        
-        # z = mu + log_var*epsilon    
-
-        # decoded
         x_hat = self.decoder(z)
 
-        # reconstruction loss
         recon_loss = self.gaussian_likelihood(x_hat, self.log_scale, x)
-
-        # kl
         kl = self.kl_divergence(z, mu, std)
-
-        # loss
         loss = -(recon_loss - self.beta*kl)
-        loss = loss.mean()
-
-        '''self.log_dict({
-            'loss/val': loss,
-            'kl/val': kl.mean(),
-            'recon_loss/val': recon_loss.mean()
-        }, on_epoch=True,
-        batch_size=batch[0].shape[1],)'''
 
         self.logger.experiment.add_scalars('loss', 
                                            {'val': loss}, global_step=self.current_epoch)

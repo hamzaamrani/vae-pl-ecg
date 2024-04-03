@@ -2,3 +2,4 @@
 lightning_logs/
 plots/
 VAE/__pycache__/
+plots*/
