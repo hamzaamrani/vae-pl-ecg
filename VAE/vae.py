@@ -4,6 +4,43 @@ from torch import nn
 import torch
 from torch.nn import functional as F
 
+class EncoderRNN(nn.Module):
+    def __init__(self, input_dim, hidden_dim):
+        super(EncoderRNN, self).__init__()
+
+        self.model = nn.LSTM(1, 128, 2, dropout = 0.2, batch_first=True).to('cuda:0')
+                
+    def forward(self, x):
+        x = torch.unsqueeze(x, 2).to('cuda:0')
+        _, (h_end, c_end) = self.model(x)
+        h_end = h_end[-1, :, :].to('cuda:0')
+        return h_end
+    
+class DecoderRNN(nn.Module):
+    def __init__(self, latent_dim, hidden_dim, output_dim):
+        super(DecoderRNN, self).__init__()
+
+        self.model = nn.LSTM(1, 128, 2).to('cuda:0')
+                            
+        self.latent_to_hidden = nn.Linear(64, 128).to('cuda:0')
+        self.hidden_to_output = nn.Linear(128, 1024).to('cuda:0')
+
+        self.decoder_inputs = torch.zeros(1, 32, 1, requires_grad=True).type(torch.cuda.FloatTensor).to('cuda:0')
+        self.c_0 = torch.zeros(2, 32, 128, requires_grad=True).type(torch.cuda.FloatTensor).to('cuda:0')
+
+        nn.init.xavier_uniform_(self.latent_to_hidden.weight)
+        nn.init.xavier_uniform_(self.hidden_to_output.weight)
+        
+    def forward(self, latent):
+        h_state = self.latent_to_hidden(latent).to('cuda:0')
+
+        h_0 = torch.stack([h_state for _ in range(2)]).to('cuda:0')
+        decoder_output, _ = self.model(self.decoder_inputs, (h_0, self.c_0))
+
+
+        out = self.hidden_to_output(decoder_output[0,:,:]).to('cuda:0')
+        return out
+
 class Encoder(nn.Module):
     def __init__(self, input_dim, hidden_dim):
         super(Encoder, self).__init__()
@@ -110,7 +147,6 @@ class VAE(pl.LightningModule):
             std = torch.exp(log_var / 2)
             eps = torch.randn_like(log_var)  # sampling epsilon        
             z = mu + log_var*eps   
-
             return z
 
     def training_step(self, batch, batch_idx):
@@ -163,5 +199,5 @@ class VAE(pl.LightningModule):
 if __name__ == '__main__':
     model = VAE()
 
-    x = torch.ones(128)
+    x = torch.ones(32,64)
     z = model.encode(x)

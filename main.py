@@ -86,7 +86,7 @@ def prepare_dataset(num_samples = 5000, num_points=1000):
         #4th experiment: baseline + random noise (more variability) + random modulation (more variability) + random phase shifts
         time_base = np.linspace(0, 4, 1024) 
         # Base frequencies for sine and cosine components
-        base_frequencies = np.array([1, 2])  # For example, 1Hz and 2Hz
+        base_frequencies = np.array([1])  # For example, 1Hz and 2Hz
         phase_shifts = np.random.uniform(0, 2*np.pi, size=base_frequencies.shape)  # Random phase shifts
         
         combined_values = np.zeros_like(time_base)
@@ -133,7 +133,7 @@ def main():
 
     # Train VAE
     vae = VAE.VAE(input_dim=DIM,latent_dim=64, hidden_dim=512, output_dim=DIM)
-    trainer = pl.Trainer(accelerator="gpu",devices=2, strategy="ddp",
+    trainer = pl.Trainer(accelerator="gpu", devices=1,#devices=2, strategy="ddp",
                          max_epochs=100)
     trainer.fit(vae, train_dataloader, val_dataloader)
 
