@@ -83,7 +83,7 @@ class Decoder(nn.Module):
         return x_hat
 
 class VAE(pl.LightningModule):
-    def __init__(self, input_dim=1000,latent_dim=64, hidden_dim=512, output_dim=1000):
+    def __init__(self, input_dim=1000,latent_dim=64, hidden_dim=512, output_dim=1000, beta=1):
         super().__init__()
 
         self.save_hyperparameters()
@@ -104,7 +104,7 @@ class VAE(pl.LightningModule):
         # for the gaussian likelihood
         self.log_scale = nn.Parameter(torch.Tensor([0.0]))
 
-        self.beta = 1 # 1=VAE
+        self.beta = beta # 1=VAE
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=1e-3)
