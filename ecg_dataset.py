@@ -9,6 +9,35 @@ from time import sleep
 from scipy.io import arff
 import matplotlib.pyplot as plt
 
+import pytorch_lightning as pl
+import tempfile
+
+
+class ECG5000DataModule(pl.LightningDataModule):
+    def __init__(self, train, val, test, batch_size=128):
+        super().__init__()
+        self.data_dir = tempfile.mkdtemp()
+        self.batch_size = batch_size
+
+        self.train = train 
+        self.val = val #ECG5000("data/ECG5000", phase='val')
+        self.test = test #ECG5000("data/ECG5000", phase='test')
+
+    def setup(self, stage=None):
+       root = "data/ECG5000"
+       #self.train = ECG5000(root, phase='train')
+       #self.val = ECG5000(root, phase='val')
+       #self.test = ECG5000(root, phase='test')
+
+    def train_dataloader(self):
+        return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, num_workers=1)
+
+    def val_dataloader(self):
+        return DataLoader(self.val, batch_size=self.batch_size, shuffle=False, num_workers=1)
+
+    def test_dataloader(self):
+        return DataLoader(self._test, batch_size=self.batch_size, shuffle=False, num_workers=1)
+    
 
 class ECG5000(Dataset):
     def __init__(self, root, phase='train'):
@@ -47,8 +76,6 @@ class ECG5000(Dataset):
         
         
 if __name__ == '__main__':
-
-    from ecg_dataset import FakeECG, ECG5000
     train_dataset = ECG5000('data/ECG5000', phase='train')
     train_loader = DataLoader(
         train_dataset,
@@ -63,11 +90,12 @@ if __name__ == '__main__':
     )
 
 
+    dm = ECG5000DataModule(batch_size=32)
 
 
-    i = iter(train_dataset)
+    '''i = iter(train_dataset)
     batch = next(i)
     plt.figure()
     plt.plot(batch.numpy().flatten())
-    plt.savefig("plot.png")
+    plt.savefig("plot.png")'''
     # plt.show()

@@ -1,1 +1,1 @@
-from VAE.vae import VAE
+from VAE.vae import VAE_trainer as VAE

@@ -6,3 +6,5 @@ VAE/__pycache__/
 plots*/
 plots_VAE/
 data/
+various.py
+__pycache__/
