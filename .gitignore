@@ -1,6 +1,8 @@
 .vscode/
 lightning_logs/
+lightning_logs_sincos/
 plots/
 VAE/__pycache__/
 plots*/
 plots_VAE/
+data/

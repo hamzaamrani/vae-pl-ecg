@@ -45,9 +45,9 @@ class Encoder(nn.Module):
     def __init__(self, input_dim, hidden_dim):
         super(Encoder, self).__init__()
 
-        self.fc1 = nn.Linear(input_dim, hidden_dim//2)
-        self.fc2 = nn.Linear(hidden_dim//2, hidden_dim//4)
-        self.fc3 = nn.Linear(hidden_dim//4, hidden_dim//4)
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim//2)
+        self.fc3 = nn.Linear(hidden_dim//2, hidden_dim//4)
         self.relu = nn.GELU()
         self.dropout = nn.Dropout(0.2)
                 
@@ -107,7 +107,7 @@ class VAE(pl.LightningModule):
         self.beta = beta # 1=VAE
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=1e-3)
+        return torch.optim.Adam(self.parameters(), lr=1e-4)
 
     def gaussian_likelihood(self, x_hat, logscale, x):
         scale = torch.exp(logscale)
