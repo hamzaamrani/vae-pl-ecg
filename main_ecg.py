@@ -11,6 +11,7 @@ from torch.utils.data import TensorDataset, DataLoader
 import pytorch_lightning as pl
 pl.seed_everything(1234)
 
+import ray
 from ray.train.lightning import (
     RayDDPStrategy,
     RayLightningEnvironment,
@@ -23,12 +24,16 @@ from ray.train import RunConfig, ScalingConfig, CheckpointConfig
 from ray.train.torch import TorchTrainer
 
 import VAE
-from ecg_dataset import ECG5000, ECG5000DataModule
+from ecg_dataset import ECG5000, ECG5000DataModule, plot_reconstructed_data
+
+ray.init(num_cpus=1, num_gpus=2)
 
 
 dataset_train = ECG5000("data/ECG5000", phase='train')
 dataset_val = ECG5000("data/ECG5000", phase='val')
 dataset_test = ECG5000("data/ECG5000", phase='test')
+
+
 
 def train_func(config):
     dm = ECG5000DataModule(dataset_train, dataset_val, dataset_test, 
@@ -47,26 +52,10 @@ def train_func(config):
     trainer = prepare_trainer(trainer)
     trainer.fit(model, datamodule=dm)
 
-if __name__ == '__main__':
-    # Configuring the search space
-    search_space = {
-        "input_dim": 140,
-        "latent_dim": tune.choice([64, 32]),
-        "hidden_dim": tune.choice([64, 128]),
-        "output_dim": 140,
-        "beta": 1,
-        #"dropout": tune.uniform(0, 0.9),
-        "lr": tune.loguniform(1e-4, 1e-1),
-        "batch_size":tune.choice([32, 64, 128, 256]),
-    }
-
-    import ray
-    ray.init(num_cpus=1, num_gpus=2)
+def tune_model (search_space, num_epochs = 200, num_samples = 20):
+    # num_epochs: The maximum training epochs
+    # num_samples: Number of sampls from parameter space
     
-    # The maximum training epochs
-    num_epochs = 200
-    # Number of sampls from parameter space
-    num_samples = 20
     # This scheduler decides at each iteration which trials are likely to perform badly, and stops these trials.
     scheduler = ASHAScheduler(max_t=num_epochs, grace_period=1, reduction_factor=2)
 
@@ -107,54 +96,36 @@ if __name__ == '__main__':
         return tuner.fit()
     
     results = tune_asha(num_samples=num_samples)
-    
-    results.get_best_result(metric="ptl/val_loss", mode="min")
-    
 
+    return results
 
-    '''
-    train_dataset = ECG5000('data/ECG5000', phase='train')
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=1,
-        shuffle=True
-    )
-    val_dataset = ECG5000('data/ECG5000', phase='val')
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=1,
-        shuffle=False
-    )
-
-    config = {
+if __name__ == '__main__':
+    search_space = {
         "input_dim": 140,
-        "latent_dim": 32,
-        "hidden_dim": 64,
+        "latent_dim": tune.choice([32, 64]),
+        "hidden_dim": tune.choice([64, 128]),
+        "hidden_dim2": tune.choice([32, 64]),
         "output_dim": 140,
-        "beta": 1,
-        "lr": 1e-3,
-        "batch_size":32
+        "beta": tune.choice([1, 5, 10, 50, 100]),
+        "dropout": tune.uniform(0, 0.9),
+        "lr": tune.loguniform(1e-4, 1e-1),
+        "batch_size":tune.choice([32, 64, 128, 256]),
     }
-
-    vae = VAE.VAE(config)
-
-    # Train model
-    trainer = pl.Trainer(accelerator="gpu", devices=2, strategy="ddp",
-                         max_epochs=10)
-    trainer.fit(vae, train_loader, val_loader)
-    '''
-
-    '''if not os.path.exists("plots"): 
-        os.makedirs("plots") 
     
-    # Signal reconstruction
-    for j in range(20):
-        batch = dm.test.__getitem__(j)[0].unsqueeze(0)
-        batch_pred = vae(batch)
+    # Hyperparameter tuning
+    results = tune_model(search_space, num_epochs = 500, num_samples = 20)
 
-        plt.figure()
-        plt.plot(batch[0,:].numpy().flatten(), label="original")
-        plt.plot(batch_pred[0,:].numpy().flatten(), label="reconstructed")
-        plt.grid(True)
-        plt.legend()
-        plt.savefig(f"plots/img_{j}.png")'''
+    # Get best model
+    best_result = results.get_best_result(metric="ptl/val_loss", mode="min")
+    print(f"best checkpoint: {best_result.checkpoint.path+'/checkpoint.ckpt'}")
+
+    vae_best = VAE.VAE.load_from_checkpoint(best_result.checkpoint.path+"/checkpoint.ckpt", 
+                                            best_result.config['train_loop_config'])
+    vae_best.eval()
+
+    # Plot signal reconstruction
+    print("Plotting signals...")
+    plot_reconstructed_data(vae_best, dataset_test)
+    
+    print("end!")
+    

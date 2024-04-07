@@ -6,5 +6,7 @@ VAE/__pycache__/
 plots*/
 plots_VAE/
 data/
-various.py
 __pycache__/
+
+various.py
+main_sincos.py

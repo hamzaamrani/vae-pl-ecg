@@ -10,15 +10,42 @@ class VAE(nn.Module):
 
         self.fc1 = nn.Linear(config["input_dim"], config["hidden_dim"])
         self.fc2 = nn.Linear(config["hidden_dim"], config["hidden_dim"])
+        self.fc3 = nn.Linear(config["hidden_dim"], config["hidden_dim2"])
 
-        self.fc_mu = nn.Linear(config["hidden_dim"], config["latent_dim"])
-        self.fc_logvar = nn.Linear(config["hidden_dim"], config["latent_dim"])
+        self.fc_mu = nn.Linear(config["hidden_dim2"], config["latent_dim"])
+        self.fc_logvar = nn.Linear(config["hidden_dim2"], config["latent_dim"])
 
-        self.fc3 = nn.Linear(config["latent_dim"], config["hidden_dim"])
-        self.fc4 = nn.Linear(config["hidden_dim"], config["output_dim"])
+        self.fc4 = nn.Linear(config["latent_dim"], config["hidden_dim2"])
+        self.fc5 = nn.Linear(config["hidden_dim2"], config["hidden_dim"])
+        self.fc6 = nn.Linear(config["hidden_dim"], config["output_dim"])
 
-        #self.dropout = nn.Dropout(config["dropout"])
+        self.dropout = nn.Dropout(config["dropout"])
         self.log_scale = nn.Parameter(torch.Tensor([0.0]))
+
+    def encode(self, x):
+        x = F.gelu(self.fc1(x))
+        x = self.dropout(x)
+        x = F.gelu(self.fc2(x))
+        x = self.dropout(x)
+        x = F.gelu(self.fc3(x))
+        return self.fc_mu(x), self.fc_logvar(x)
+
+    def reparameterize(self, mu, logvar):
+        std = torch.exp(logvar / 2)
+        q = torch.distributions.Normal(mu, std)
+        z = q.rsample()
+        return z
+
+    def decode(self, z):
+        x_hat = F.gelu(self.fc4(z))
+        x_hat = self.dropout(x_hat)
+        x_hat = F.gelu(self.fc5(x_hat))
+        return self.fc6(x_hat)
+
+    def forward(self, x):
+        mu, logvar = self.encode(x)
+        z = self.reparameterize(mu, logvar)
+        return self.decode(z), mu, logvar
 
     def gaussian_likelihood(self, x_hat, logscale, x):
         scale = torch.exp(logscale)
@@ -40,26 +67,6 @@ class VAE(nn.Module):
         kl = (log_qzx - log_pz)
         kl = kl.sum(-1).mean()
         return kl
-
-    def encode(self, x):
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        return self.fc_mu(x), self.fc_logvar(x)
-
-    def reparameterize(self, mu, logvar):
-        std = torch.exp(logvar / 2)
-        q = torch.distributions.Normal(mu, std)
-        z = q.rsample()
-        return z
-
-    def decode(self, z):
-        x_hat = F.relu(self.fc3(z))
-        return torch.sigmoid(self.fc4(x_hat))
-
-    def forward(self, x):
-        mu, logvar = self.encode(x)
-        z = self.reparameterize(mu, logvar)
-        return self.decode(z), mu, logvar
     
 
 
@@ -135,11 +142,13 @@ if __name__ == '__main__':
     config = {
         "input_dim": 140,
         "latent_dim": 32,
-        "hidden_dim": 64,
+        "hidden_dim": 128,
+        "hidden_dim2": 64,
         "output_dim": 140,
         "beta": 1,
         "lr": 1e-3,
-        "batch_size":32
+        "batch_size":32,
+        "dropout":0
     }
 
     model = VAE(config)
@@ -151,5 +160,3 @@ if __name__ == '__main__':
         z = model.encode(x)
         x_hat = model.decode(z)
         x_hat, mu, logvar = model(x)
-
-    BCE, KLD = loss_function(x_hat, x, mu, logvar)

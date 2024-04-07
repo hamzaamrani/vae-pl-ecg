@@ -12,6 +12,26 @@ import matplotlib.pyplot as plt
 import pytorch_lightning as pl
 import tempfile
 
+def plot_reconstructed_data(vae_best, data):
+    test_loader = DataLoader(
+        data,
+        batch_size=50,
+        shuffle=False
+    )
+
+    batch = next(iter(test_loader))[0].to(vae_best.device)
+    batch_pred = vae_best(batch)[0]
+
+    if not os.path.exists("plots"): 
+        os.makedirs("plots") 
+    
+    for i in range(20):
+        plt.figure()
+        plt.plot(batch[i,:].cpu().detach().numpy().flatten(), label="original")
+        plt.plot(batch_pred[i,:].cpu().detach().numpy().flatten(), label="reconstructed")
+        plt.grid(True)
+        plt.legend()
+        plt.savefig(f"plots/img_{i}.png")
 
 class ECG5000DataModule(pl.LightningDataModule):
     def __init__(self, train, val, test, batch_size=128):
@@ -50,11 +70,19 @@ class ECG5000(Dataset):
         dataset = pd.concat([pd.DataFrame(dataset1), pd.DataFrame(dataset2)])
         dataset["target"] = pd.to_numeric(dataset["target"])
         if phase == 'train':
-            dataset = dataset.loc[dataset['target'] == 1].iloc[:-200]
+            ds = [dataset.loc[dataset['target'] == i].iloc[:-400] for i in [1, 2, 3, 4, 5]]
+            dataset = pd.concat(ds, axis=0)
+            #dataset = dataset.loc[dataset['target'] == 1].iloc[:-200]
+            #dataset2 = dataset.loc[dataset['target'] != 1].iloc[:-200]
+            #dataset = pd.concat([dataset1, dataset2], axis=0)
         elif phase == 'val':
-            dataset = dataset.loc[dataset['target'] == 1].iloc[-200:]
+            ds = [dataset.loc[dataset['target'] == i].iloc[-400:-200] for i in [1, 2, 3, 4, 5]]
+            dataset = pd.concat(ds, axis=0)
+            #dataset = dataset.loc[dataset['target'] == 1].iloc[-200:]
         else:
-            dataset = dataset.loc[dataset['target'] != 1]
+            ds = [dataset.loc[dataset['target'] == i].iloc[-200:] for i in [1, 2, 3, 4, 5]]
+            dataset = pd.concat(ds, axis=0)
+            #dataset = dataset.loc[dataset['target'] != 1].iloc[:]
         self.dataset = dataset
 
         super(ECG5000, self).__init__()
