@@ -25,7 +25,7 @@ def plot_reconstructed_data(vae_best, data):
     if not os.path.exists("plots"): 
         os.makedirs("plots") 
     
-    for i in range(20):
+    for i in range(50):
         plt.figure()
         plt.plot(batch[i,:].cpu().detach().numpy().flatten(), label="original")
         plt.plot(batch_pred[i,:].cpu().detach().numpy().flatten(), label="reconstructed")

@@ -33,13 +33,17 @@ dataset_train = ECG5000("data/ECG5000", phase='train')
 dataset_val = ECG5000("data/ECG5000", phase='val')
 dataset_test = ECG5000("data/ECG5000", phase='test')
 
+MODEL_NAME = "vqvae"
 
 
 def train_func(config):
     dm = ECG5000DataModule(dataset_train, dataset_val, dataset_test, 
                            batch_size=config["batch_size"])
     
-    model = VAE.VAE(config)
+    if MODEL_NAME == "vae":
+        model = VAE.VAE(config)
+    elif MODEL_NAME == "vqvae":
+        model = VAE.VQVAE(config)
     
     trainer = pl.Trainer(
         devices="auto",
@@ -100,20 +104,33 @@ def tune_model (search_space, num_epochs = 200, num_samples = 20):
     return results
 
 if __name__ == '__main__':
-    search_space = {
-        "input_dim": 140,
-        "latent_dim": tune.choice([32, 64]),
-        "hidden_dim": tune.choice([64, 128]),
-        "hidden_dim2": tune.choice([32, 64]),
-        "output_dim": 140,
-        "beta": tune.choice([1, 5, 10, 50, 100]),
-        "dropout": tune.uniform(0, 0.9),
-        "lr": tune.loguniform(1e-4, 1e-1),
-        "batch_size":tune.choice([32, 64, 128, 256]),
-    }
+    if MODEL_NAME == "vae":
+        search_space = {
+            "input_dim": 140,
+            "latent_dim": tune.choice([32, 64]),
+            "hidden_dim": tune.choice([64, 128]),
+            "hidden_dim2": tune.choice([32, 64]),
+            "output_dim": 140,
+            "beta": tune.choice([1, 5, 10, 50, 100]),
+            "dropout": tune.uniform(0, 0.9),
+            "lr": tune.loguniform(1e-4, 1e-1),
+            "batch_size":tune.choice([32, 64, 128, 256]),
+        }
+    elif MODEL_NAME == "vqvae":
+        search_space = {
+            "input_dim": 140,
+            "hidden_dim1": tune.choice([64, 128]),
+            "hidden_dim2": tune.choice([32, 64]),
+            "n_embeddings":tune.choice([256, 512]),
+            "embedding_dim":tune.choice([32, 64]),
+            "beta": tune.uniform(0.1, 2.),
+            "dropout": tune.uniform(0, 0.9),
+            "lr": tune.loguniform(1e-4, 1e-1),
+            "batch_size":tune.choice([32, 64, 128, 256]),
+        }
     
     # Hyperparameter tuning
-    results = tune_model(search_space, num_epochs = 500, num_samples = 20)
+    results = tune_model(search_space, num_epochs = 500, num_samples = 10)
 
     # Get best model
     best_result = results.get_best_result(metric="ptl/val_loss", mode="min")
