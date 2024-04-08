@@ -23,7 +23,7 @@ from ray.tune.schedulers import ASHAScheduler
 from ray.train import RunConfig, ScalingConfig, CheckpointConfig
 from ray.train.torch import TorchTrainer
 
-import VAE
+import models
 from ecg_dataset import ECG5000, ECG5000DataModule, plot_reconstructed_data
 
 ray.init(num_cpus=1, num_gpus=2)
@@ -41,9 +41,9 @@ def train_func(config):
                            batch_size=config["batch_size"])
     
     if MODEL_NAME == "vae":
-        model = VAE.VAE(config)
+        model = models.VAE(config)
     elif MODEL_NAME == "vqvae":
-        model = VAE.VQVAE(config)
+        model = models.VQVAE(config)
     
     trainer = pl.Trainer(
         devices="auto",
@@ -130,19 +130,25 @@ if __name__ == '__main__':
         }
     
     # Hyperparameter tuning
-    results = tune_model(search_space, num_epochs = 500, num_samples = 10)
+    results = tune_model(search_space, num_epochs = 1, num_samples = 1)
+    #results = tune_model(search_space, num_epochs = 500, num_samples = 10)
 
     # Get best model
     best_result = results.get_best_result(metric="ptl/val_loss", mode="min")
     print(f"best checkpoint: {best_result.checkpoint.path+'/checkpoint.ckpt'}")
 
-    vae_best = VAE.VAE.load_from_checkpoint(best_result.checkpoint.path+"/checkpoint.ckpt", 
+    if MODEL_NAME == "vae":
+        model_best = models.VAE.load_from_checkpoint(best_result.checkpoint.path+"/checkpoint.ckpt", 
                                             best_result.config['train_loop_config'])
-    vae_best.eval()
+    elif MODEL_NAME == "vqvae":
+        model_best = models.VQVAE.load_from_checkpoint(best_result.checkpoint.path+"/checkpoint.ckpt", 
+                                            best_result.config['train_loop_config'])
+        
+    model_best.eval()
 
     # Plot signal reconstruction
     print("Plotting signals...")
-    plot_reconstructed_data(vae_best, dataset_test)
+    plot_reconstructed_data(model_best, dataset_test, MODEL_NAME)
     
     print("end!")
     

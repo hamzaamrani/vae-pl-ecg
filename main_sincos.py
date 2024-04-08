@@ -10,7 +10,7 @@ pl.seed_everything(1234)
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
-import VAE
+import models
 
 
 def prepare_dataset(num_samples = 5000, num_points=1000, version = 3):
@@ -110,7 +110,7 @@ def main():
     # Vanilla VAE
     #vae = VAE.VAE(input_dim=DIM,latent_dim=64, hidden_dim=512, output_dim=DIM)
     # Beta-VAE
-    vae = VAE.VAE(input_dim=DIM,latent_dim=64, hidden_dim=512, output_dim=DIM, beta=5)
+    vae = models.VAE(input_dim=DIM,latent_dim=64, hidden_dim=512, output_dim=DIM, beta=5)
 
     # Train model
     trainer = pl.Trainer(accelerator="gpu", devices=1,#devices=2, strategy="ddp",

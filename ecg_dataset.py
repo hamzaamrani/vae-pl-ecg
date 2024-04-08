@@ -12,23 +12,30 @@ import matplotlib.pyplot as plt
 import pytorch_lightning as pl
 import tempfile
 
-def plot_reconstructed_data(vae_best, data):
+def plot_reconstructed_data(model_best, data, MODEL_NAME):
     test_loader = DataLoader(
         data,
         batch_size=50,
         shuffle=False
     )
 
-    batch = next(iter(test_loader))[0].to(vae_best.device)
-    batch_pred = vae_best(batch)[0]
+    batch = next(iter(test_loader))[0].to(model_best.device)
+
+    if MODEL_NAME == "vae":
+        batch_pred = model_best(batch)[0] 
+    elif MODEL_NAME == "vqvae":
+        batch_pred = model_best(batch)[1] 
 
     if not os.path.exists("plots"): 
         os.makedirs("plots") 
     
     for i in range(50):
         plt.figure()
-        plt.plot(batch[i,:].cpu().detach().numpy().flatten(), label="original")
-        plt.plot(batch_pred[i,:].cpu().detach().numpy().flatten(), label="reconstructed")
+        original = batch[i,:].cpu().detach().numpy().flatten()
+        reconstructed = batch_pred[i,:].cpu().detach().numpy().flatten()
+        plt.plot(original, label="original", color = "blue")
+        plt.plot(reconstructed, label="reconstructed", color= "red")
+        plt.fill_between(np.arange(140),reconstructed, original,color='lightcoral', alpha=0.2, label="error")
         plt.grid(True)
         plt.legend()
         plt.savefig(f"plots/img_{i}.png")

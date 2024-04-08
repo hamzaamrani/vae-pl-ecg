@@ -5,9 +5,9 @@ from torch.nn import functional as F
 import numpy as np
 
 
-from VAE.vqvae_utils import Encoder
-from VAE.vqvae_utils import VectorQuantizer
-from VAE.vqvae_utils import Decoder
+from models.vqvae_utils import Encoder
+from models.vqvae_utils import VectorQuantizer
+from models.vqvae_utils import Decoder
 
 
 
@@ -19,7 +19,7 @@ class VQVAE(nn.Module):
         self.pre_quantization = nn.Linear(config['hidden_dim2'], config['embedding_dim'])
         
         # pass continuous latent vector through discretization bottleneck
-        self.vector_quantization = VectorQuantizer(config)
+        self.codebooks = VectorQuantizer(config)
         
         # decode the discrete latent representation
         self.decoder = Decoder(config)
@@ -29,7 +29,7 @@ class VQVAE(nn.Module):
         z_e = self.encoder(x)
 
         z_e = self.pre_quantization(z_e)
-        embedding_loss, z_q, perplexity, _, _ = self.vector_quantization(
+        embedding_loss, z_q, perplexity, _, _ = self.codebooks(
             z_e)
         x_hat = self.decoder(z_q)
 
