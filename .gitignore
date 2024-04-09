@@ -11,6 +11,7 @@ plots/
 VAE/__pycache__/
 plots*/
 plots_VAE/
+plots_*/
 data/
 __pycache__/
 

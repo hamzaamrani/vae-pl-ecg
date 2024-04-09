@@ -1,4 +1,5 @@
 import numpy as np
+import pytorch_lightning as pl
 import torch
 from torch.nn.parameter import Parameter
 import torch.nn as nn
@@ -34,6 +35,10 @@ class PAE(nn.Module):
             "batch_size":32,
             "dropout":0
         }
+        input_channels = config["input_channels"]
+        embedding_channels = config["embedding_channels"]
+        time_range = config["time_range"]
+        window = config["window"]
 
         self.input_channels = config["input_channels"]
         self.embedding_channels = config["embedding_channels"]
@@ -147,7 +152,10 @@ class PAE_trainer(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x = batch[0]
 
-        yPred, latent, signal, params = network(x)
+        x = x.unsqueeze(1)
+        x = F.pad(x, (0,1), "constant", 0)
+
+        yPred, latent, signal, params = self.pae(x)
         loss = F.mse_loss(yPred, x)
         
         self.log("ptl/train_loss", loss, on_step=False, on_epoch=True)
@@ -158,7 +166,10 @@ class PAE_trainer(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         x = batch[0]
 
-        yPred, latent, signal, params = network(x)
+        x = x.unsqueeze(1)
+        x = F.pad(x, (0,1), "constant", 0)
+
+        yPred, latent, signal, params = self.pae(x)
         loss = F.mse_loss(yPred, x)
 
         self.log("ptl/val_loss", loss)
@@ -183,6 +194,6 @@ if __name__ == '__main__':
     model = PAE(config)
     print(model)
 
-    x = torch.ones(32,1,141)
+    x = torch.ones(32,140)
 
     y, latent, signal, params = model(x)

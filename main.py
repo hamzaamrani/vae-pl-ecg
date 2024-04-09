@@ -33,7 +33,7 @@ dataset_train = ECG5000("data/ECG5000", phase='train')
 dataset_val = ECG5000("data/ECG5000", phase='val')
 dataset_test = ECG5000("data/ECG5000", phase='test')
 
-MODEL_NAME = "vqvae"
+MODEL_NAME = "pae"
 
 
 def train_func(config):
@@ -44,6 +44,9 @@ def train_func(config):
         model = models.VAE(config)
     elif MODEL_NAME == "vqvae":
         model = models.VQVAE(config)
+    elif MODEL_NAME == "pae":
+        model = models.PAE(config)
+    
     
     trainer = pl.Trainer(
         devices="auto",
@@ -128,10 +131,19 @@ if __name__ == '__main__':
             "lr": tune.loguniform(1e-4, 1e-1),
             "batch_size":tune.choice([32, 64, 128, 256]),
         }
+    elif MODEL_NAME == "pae":
+        search_space = {
+            "input_channels": 1,
+            "embedding_channels": tune.choice([2, 3, 4, 5, 6, 7, 8, 9, 10]), #desired number of latent phase channels (usually between 2-10)
+            "time_range": 141,
+            "window": 1,
+            "lr": tune.loguniform(1e-4, 1e-1),
+            "batch_size":tune.choice([32, 64, 128, 256]),
+            }
     
     # Hyperparameter tuning
     #results = tune_model(search_space, num_epochs = 1, num_samples = 1)
-    results = tune_model(search_space, num_epochs = 500, num_samples = 50)
+    results = tune_model(search_space, num_epochs = 500, num_samples = 10)
 
     # Get best model
     best_result = results.get_best_result(metric="ptl/val_loss", mode="min")
@@ -143,7 +155,10 @@ if __name__ == '__main__':
     elif MODEL_NAME == "vqvae":
         model_best = models.VQVAE.load_from_checkpoint(best_result.checkpoint.path+"/checkpoint.ckpt", 
                                             best_result.config['train_loop_config'])
-        
+    elif MODEL_NAME == "pae":
+        model_best = models.PAE.load_from_checkpoint(best_result.checkpoint.path+"/checkpoint.ckpt", 
+                                            best_result.config['train_loop_config'])
+    
     model_best.eval()
 
     # Plot signal reconstruction

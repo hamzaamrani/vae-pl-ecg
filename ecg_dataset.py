@@ -10,6 +10,7 @@ from scipy.io import arff
 import matplotlib.pyplot as plt
 
 import pytorch_lightning as pl
+from torch.nn import functional as F
 import tempfile
 
 def plot_reconstructed_data(model_best, data, MODEL_NAME):
@@ -21,10 +22,17 @@ def plot_reconstructed_data(model_best, data, MODEL_NAME):
 
     batch = next(iter(test_loader))[0].to(model_best.device)
 
+    N = 140
+
     if MODEL_NAME == "vae":
         batch_pred = model_best(batch)[0] 
     elif MODEL_NAME == "vqvae":
         batch_pred = model_best(batch)[1] 
+    elif MODEL_NAME == "pae":
+        batch = batch.unsqueeze(1)
+        batch = F.pad(batch, (0,1), "constant", 0)
+        batch_pred = model_best(batch)[0] 
+        N = 141
 
     if not os.path.exists("plots"): 
         os.makedirs("plots") 
@@ -35,7 +43,7 @@ def plot_reconstructed_data(model_best, data, MODEL_NAME):
         reconstructed = batch_pred[i,:].cpu().detach().numpy().flatten()
         plt.plot(original, label="original", color = "blue")
         plt.plot(reconstructed, label="reconstructed", color= "red")
-        plt.fill_between(np.arange(140),reconstructed, original,color='lightcoral', alpha=0.2, label="error")
+        plt.fill_between(np.arange(N),reconstructed, original,color='lightcoral', alpha=0.2, label="error")
         plt.grid(True)
         plt.legend()
         plt.savefig(f"plots/img_{i}.png")
