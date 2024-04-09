@@ -130,8 +130,8 @@ if __name__ == '__main__':
         }
     
     # Hyperparameter tuning
-    results = tune_model(search_space, num_epochs = 1, num_samples = 1)
-    #results = tune_model(search_space, num_epochs = 500, num_samples = 10)
+    #results = tune_model(search_space, num_epochs = 1, num_samples = 1)
+    results = tune_model(search_space, num_epochs = 500, num_samples = 50)
 
     # Get best model
     best_result = results.get_best_result(metric="ptl/val_loss", mode="min")
