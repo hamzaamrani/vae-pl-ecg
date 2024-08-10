@@ -1,45 +1,48 @@
-import numpy as np
-np.random.seed(0)
 import os
 import random
-from sklearn.model_selection import train_test_split
-import matplotlib.pyplot as plt
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
-import torch
-from torch.utils.data import TensorDataset, DataLoader
+import numpy as np
+
+np.random.seed(0)
+
+import matplotlib.pyplot as plt
 import pytorch_lightning as pl
+import torch
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from torch.utils.data import DataLoader, TensorDataset
+
 pl.seed_everything(1234)
 
+
 import ray
-from ray.train.lightning import (
-    RayDDPStrategy,
-    RayLightningEnvironment,
-    RayTrainReportCallback,
-    prepare_trainer,
-)
 from ray import tune
-from ray.tune.schedulers import ASHAScheduler
-from ray.train import RunConfig, ScalingConfig, CheckpointConfig
+from ray.train import CheckpointConfig, RunConfig, ScalingConfig
+from ray.train.lightning import (RayDDPStrategy, RayLightningEnvironment,
+                                 RayTrainReportCallback, prepare_trainer)
 from ray.train.torch import TorchTrainer
+from ray.tune.schedulers import ASHAScheduler
 
 import models
 from ecg_dataset import ECG5000, ECG5000DataModule, plot_reconstructed_data
 
+# Initialize Ray with specified resources
 ray.init(num_cpus=1, num_gpus=2)
 
-
+# Load ECG5000 dataset for training, validation, and testing
 dataset_train = ECG5000("data/ECG5000", phase='train')
 dataset_val = ECG5000("data/ECG5000", phase='val')
 dataset_test = ECG5000("data/ECG5000", phase='test')
 
+# Define the model name to be used
 MODEL_NAME = "pae"
 
-
 def train_func(config):
+    # Initialize the data module with the given configuration
     dm = ECG5000DataModule(dataset_train, dataset_val, dataset_test, 
                            batch_size=config["batch_size"])
     
+    # Select the model based on the MODEL_NAME
     if MODEL_NAME == "vae":
         model = models.VAE(config)
     elif MODEL_NAME == "vqvae":
@@ -47,7 +50,7 @@ def train_func(config):
     elif MODEL_NAME == "pae":
         model = models.PAE(config)
     
-    
+    # Initialize the PyTorch Lightning trainer with Ray integration
     trainer = pl.Trainer(
         devices="auto",
         accelerator="auto",
@@ -56,12 +59,14 @@ def train_func(config):
         plugins=[RayLightningEnvironment()],
         enable_progress_bar=False
     )
+    # Prepare the trainer for Ray
     trainer = prepare_trainer(trainer)
+    # Fit the model using the trainer and data module
     trainer.fit(model, datamodule=dm)
 
-def tune_model (search_space, num_epochs = 200, num_samples = 20):
+def tune_model(search_space, num_epochs=200, num_samples=20):
     # num_epochs: The maximum training epochs
-    # num_samples: Number of sampls from parameter space
+    # num_samples: Number of samples from parameter space
     
     # This scheduler decides at each iteration which trials are likely to perform badly, and stops these trials.
     scheduler = ASHAScheduler(max_t=num_epochs, grace_period=1, reduction_factor=2)
@@ -106,7 +111,7 @@ def tune_model (search_space, num_epochs = 200, num_samples = 20):
 
     return results
 
-if __name__ == '__main__':
+def main():
     if MODEL_NAME == "vae":
         search_space = {
             "input_dim": 140,
@@ -134,7 +139,7 @@ if __name__ == '__main__':
     elif MODEL_NAME == "pae":
         search_space = {
             "input_channels": 1,
-            "embedding_channels": tune.choice([2, 3, 4, 5, 6, 7, 8, 9, 10]), #desired number of latent phase channels (usually between 2-10)
+            "embedding_channels": tune.choice([2, 3, 4, 5]), #desired number of latent phase channels (usually between 2-10)
             "time_range": 141,
             "window": 1,
             "lr": tune.loguniform(1e-4, 1e-1),
@@ -142,7 +147,6 @@ if __name__ == '__main__':
             }
     
     # Hyperparameter tuning
-    #results = tune_model(search_space, num_epochs = 1, num_samples = 1)
     results = tune_model(search_space, num_epochs = 500, num_samples = 10)
 
     # Get best model
@@ -166,4 +170,7 @@ if __name__ == '__main__':
     plot_reconstructed_data(model_best, dataset_test, MODEL_NAME)
     
     print("end!")
+
+if __name__ == '__main__':
+    main()
     
