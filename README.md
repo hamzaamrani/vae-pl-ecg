@@ -1,4 +1,4 @@
-# vae-pl-examples
+# vae-pl-ecg
 
 ## Description
 This repository contains examples and implementations of Variational Autoencoders (VAEs) using PyTorch Lightning. It is designed to help users understand and experiment with VAEs in a structured and scalable manner.
